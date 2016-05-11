@@ -1,17 +1,29 @@
-{ fetchurl, stdenv, unzip }:
+# Lifted almost verbatim from
+# https://github.com/NixOS/nixpkgs/blob/a2612dc0f13eb995ed3c491b96c119e2de892248/pkgs/top-level/go-packages.nix
+
+{ goPackages }:
 let
-  version = "0.6.9";
-in stdenv.mkDerivation rec {
-  name = "terraform-${version}";
-  src = fetchurl {
-    url = "https://releases.hashicorp.com/terraform/${version}/terraform_${version}_linux_amd64.zip";
-    sha256 = "1rpsmdlsz2mvaj57gyyjh4c6ygw7pd0lpxgqxx3rzgk5w5nygly7";
+
+  inherit (goPackages) buildFromGitHub go;
+
+  isGo14 = go.meta.branch == "1.4";
+  isGo15 = go.meta.branch == "1.5";
+
+  terraform = buildFromGitHub {
+    rev = "v0.6.15";
+    owner = "hashicorp";
+    repo = "terraform";
+    disabled = isGo14 || isGo15;
+    sha256 = "1mf98hagb0yp40g2mbar7aw7hmpq01clnil6y9khvykrb33vy0nb";
+
+    postInstall = ''
+      # prefix all the plugins with "terraform-"
+      for i in $bin/bin/*; do
+        if [[ ! $(basename $i) =~ terraform* ]]; then
+          mv -v $i $bin/bin/terraform-$(basename $i);
+        fi
+      done
+    '';
   };
-  buildInputs = [ unzip ];
-  sourceRoot = ".";
-  installPhase = ''
-    mkdir -p $out/bin
-    mv $sourceRoot/terraform* $out/bin/
-    chmod +x $out/bin/*
-  '';
-}
+
+in terraform
